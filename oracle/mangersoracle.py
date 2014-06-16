@@ -31,20 +31,23 @@ def pprint(n, places=20):
   else:
     return n
 
-def f_to_str(f):
-  half = modpow(f, e, n)
-  whole = (half * c) % n
-  return hex(whole)[2:-1]
-
 class MangersOracle(object):
 
-  def __init__(self, options, cheatingPlaintext=None):
+  def __init__(self, n, e, options, cheatingPlaintext=None):
+    self.n = n
+    self.e = e
+    self.c = None
     self.options = options
     self.cheatingPlaintext = cheatingPlaintext
     return
 
+  def f_to_str(self, f):
+    half = modpow(f, self.e, self.n)
+    whole = (half * self.c) % self.n
+    return hex(whole)[2:-1]
+
   def ask_oracle(self, f):
-    s = f_to_str(f)
+    s = self.f_to_str(f)
     return self.oracle(s)
 
   def oracle(self):
@@ -79,11 +82,11 @@ class MangersOracle(object):
 
   def stage2(self, k, B, f1):
 
-    f2 = int(math.floor((n + B) / B) * (f1 / 2))
+    f2 = int(math.floor((self.n + B) / B) * (f1 / 2))
 
     self.verbose("\tf2= %s" % pprint(f2))
     self.cheat("\t\tf2*m= %s" % pprint(f2* self.cheatingPlaintext))
-    self.verbose("\t\tf2*m E [n/2, n+B): %s - %s" % (pprint(n / 2), pprint(n + B)))
+    self.verbose("\t\tf2*m E [n/2, n+B): %s - %s" % (pprint(self.n / 2), pprint(self.n + B)))
 
     iterations = 0
     gt = self.ask_oracle(f2)
@@ -96,10 +99,10 @@ class MangersOracle(object):
       gt = self.ask_oracle(f2)
 
       if gt:
-        self.verbose("\t\tf2*m E [n/2, n): %s - %s" % (pprint(n / 2), pprint(n)))
+        self.verbose("\t\tf2*m E [n/2, n): %s - %s" % (pprint(self.n / 2), pprint(self.n)))
       else:
         self.verbose("\t\tStopping...")
-        self.verbose("\t\tf2*m E [n, n+B): %s - %s" % (pprint(n), pprint(n + B)))
+        self.verbose("\t\tf2*m E [n, n+B): %s - %s" % (pprint(self.n), pprint(self.n + B)))
 
       iterations += 1
 
@@ -115,8 +118,8 @@ class MangersOracle(object):
   def stage3(self, k, Bd, f2):
 
     getcontext().prec=350
-    mmin = Decimal(n / f2).to_integral_value(rounding = ROUND_CEILING)
-    mmax = Decimal((n + Bd) / f2).to_integral_value(rounding = ROUND_FLOOR)
+    mmin = Decimal(self.n / f2).to_integral_value(rounding = ROUND_CEILING)
+    mmax = Decimal((self.n + Bd) / f2).to_integral_value(rounding = ROUND_FLOOR)
 
     f3 = f2
     oldf3 = -1
@@ -127,9 +130,9 @@ class MangersOracle(object):
     print("Beginning phase 3...")
     while oldf3 != f3 and mmin < mmax and iterations < iteratestop and (not self.options.cheat or (difference1 > 0 and difference2 > 0)):
       ftmp = Decimal((2 * Bd) / (mmax - mmin)).to_integral_value(rounding=ROUND_FLOOR)
-      i =  Decimal(ftmp * mmin / n).to_integral_value(rounding=ROUND_CEILING)
+      i =  Decimal(ftmp * mmin / self.n).to_integral_value(rounding=ROUND_CEILING)
       oldf3 = f3
-      f3 = Decimal((i * n) / mmin).to_integral_value(rounding=ROUND_CEILING)
+      f3 = Decimal((i * self.n) / mmin).to_integral_value(rounding=ROUND_CEILING)
 
       if self.options.cheat:
         difference1 = mmax - self.cheatingPlaintext
@@ -145,26 +148,26 @@ class MangersOracle(object):
         if not self.options.cheat:
           print("\tmmax to mmax= %s" % pprint(difference))
 
-        print("\tmmin=" % pprint(mmin))
-        print("\tmmax=" % pprint(mmax))
+        print("\tmmin= %s" % pprint(mmin))
+        print("\tmmax= %s" % pprint(mmax))
         print("")
         print("\ti= %s" % pprint(i))
         print("\tf3= %s" % pprint(f3))
-        self.cheat("\tf3*m= %s", pprint(f3 * self.cheatingPlaintext))
-        print("\tf3*m E [in, in+2B): %s - %s" % (pprint(i * n), pprint(i * n + 2 * Bd)))
+        #self.cheat("\tf3*m= %s", pprint(f3 * self.cheatingPlaintext))
+        print("\tf3*m E [in, in+2B): %s - %s" % (pprint(i * self.n), pprint(i * self.n + 2 * Bd)))
 
       if f3 == 0:
         break
 
       gt = self.ask_oracle(int(f3))
       if gt:
-        mmin = Decimal((i * n + Bd) / f3).to_integral_value(rounding=ROUND_CEILING)
+        mmin = Decimal((i * self.n + Bd) / f3).to_integral_value(rounding=ROUND_CEILING)
         self.verbose("\tGreater: new mmin.")
-        self.verbose("\tf3*m E [in +B, in +2B): %s - %s" % (pprint(i * n + Bd), pprint(i * n + 2 * Bd)))
+        self.verbose("\tf3*m E [in +B, in +2B): %s - %s" % (pprint(i * self.n + Bd), pprint(i * self.n + 2 * Bd)))
       else:
-        mmax = Decimal((i * n + Bd) / f3).to_integral_value(rounding=ROUND_FLOOR)
+        mmax = Decimal((i * self.n + Bd) / f3).to_integral_value(rounding=ROUND_FLOOR)
         self.verbose("\tLess: new mmax.")
-        self.verbose("\tf3*m E [in, in + B): %s - %s" % (pprint(i * n), pprint(i * n + Bd)))
+        self.verbose("\tf3*m E [in, in + B): %s - %s" % (pprint(i * self.n), pprint(i * self.n + Bd)))
 
       iterations += 1
 
@@ -238,19 +241,21 @@ class MangersOracle(object):
 
     return M
 
-  def run(self, n, e, c):
-    k = Decimal(str(math.log(n, 256))).to_integral_value(rounding=ROUND_CEILING)
-    #k = math.ceil(math.log(n, 256))
+  def run(self, c):
+    self.c = c
+
+    k = Decimal(str(math.log(self.n, 256))).to_integral_value(rounding=ROUND_CEILING)
+    #k = math.ceil(math.log(self.n, 256))
     B = getcontext().power(Decimal(2), Decimal(8*(k-1)))
     #B = pow(2, 8*(k-1))
     #Bd = Decimal(str(B))
 
-    if 2*B >= n:
+    if 2 * B >= self.n:
       raise exception("Obscure, unhandled case: 2B >= n")
 
     self.verbose("k = %s" % k)
     self.verbose("B = %s" % pprint(B))
-    self.verbose("n = %s" % pprint(n))
+    self.verbose("n = %s" % pprint(self.n))
 
     f1 = self.stage1(k, B)
     print("Finished Stage 1 with a f1 of %s" % f1)
@@ -295,10 +300,10 @@ if __name__ == "__main__":
   (options, args) = parser.parse_args()
 
   n = 157864837766412470414898605682479126709913814457720048403886101369805832566211909035448137352055018381169566146003377316475222611235116218157405481257064897859932106980034542393008803178451117972197473517842606346821132572405276305083616404614783032204836434549683833460267309649602683257403191134393810723409
-  e = 0x10001
+  e = 65537
   c = int('5033692c41c8a1bdc2c78eadffc47da73470b2d25c9dc0ce2c0d0282f0d5f845163ab6f2f296540c1a1090d826648e12644945ab922a125bb9c67f8caaef6b4abe06b92d3365075fbb5d8f19574ddb5ee80c0166303702bbba249851836a58c3baf23f895f9a16e5b15f2a698be1e3efb74d5c5c4fddc188835a16cf7c9c132c', 16)
-  p = int('2ea4875381beb0f84818ce1c4df72574f194f7abefe9601b21da092f484fa886ff0de66edf8babd4bd5b35dfdb0e642382947270a8f197e3cbaaa37cb8f7007f4604794a51c3bd65f8d17bfad9e699726ff9f61b99762d130777872eb4e9f1532cf3bfbfc3d2ad5d8d4582cc90a2e59915c462967b19965f77225447ce660d', 16)
+  p = '1' #int('2ea4875381beb0f84818ce1c4df72574f194f7abefe9601b21da092f484fa886ff0de66edf8babd4bd5b35dfdb0e642382947270a8f197e3cbaaa37cb8f7007f4604794a51c3bd65f8d17bfad9e699726ff9f61b99762d130777872eb4e9f1532cf3bfbfc3d2ad5d8d4582cc90a2e59915c462967b19965f77225447ce660d', 16)
 
-  m = TestOracle(options, cheatingPlaintext=p)
-  m.run(n, e, c)
+  m = TestOracle(n, e, options, cheatingPlaintext=p)
+  m.run(c)
 
